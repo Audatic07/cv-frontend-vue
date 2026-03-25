@@ -23,13 +23,13 @@
                     @dragover.prevent
                 >
                     <v-file-input
-                        label="Click to Select or Drag and drop file here"
+                        label="Click to Select or Drag and drop file here (.cv or .canonical.json)"
                         class="fileInput"
                         id="fileInput"
                         center-affix
                         :error-messages="errorMessage"
                         max-errors="1"
-                        accept=".cv"
+                        accept=".cv,.json"
                         v-model="file"
                         prepend-icon="mdi-paperclip"
                     >
@@ -40,6 +40,9 @@
                             >
                                 <v-chip size="x-large" class="me-2">
                                     {{ fileName }}
+                                    <template v-if="fileName.endsWith('.canonical.json')">
+                                        &nbsp;(Canonical)
+                                    </template>
                                 </v-chip>
                             </template>
                         </template>
@@ -67,6 +70,7 @@
 import { generateSaveData } from '#/simulator/src/data/save'
 import { escapeHtml } from '#/simulator/src/utils'
 import load from '#/simulator/src/data/load'
+import loadCanonical, { isCanonicalFormat } from '#/simulator/src/data/structured_format/loadCanonical'
 import { useState } from '#/store/SimulatorStore/state'
 import { useProjectStore } from '#/store/projectStore'
 import { ref } from 'vue'
@@ -107,9 +111,13 @@ const errorMessage = ref('')
 function addDropFile(e: DragEvent) {
     if (e.dataTransfer?.files[0]) {
         const droppedFile = e.dataTransfer?.files[0]
-        const fileExtension = droppedFile.name.split('.').pop()
+        const fileName = droppedFile.name
+        const isValidFormat =
+            fileName.endsWith('.cv') ||
+            fileName.endsWith('.canonical.json') ||
+            fileName.endsWith('.json')
 
-        if (fileExtension === 'cv') {
+        if (isValidFormat) {
             file.value[0] = droppedFile
             document
                 .querySelector('.fileInput')
@@ -118,30 +126,38 @@ function addDropFile(e: DragEvent) {
         } else {
             document.querySelector('.fileInput')?.classList.add('error--text')
             errorMessage.value =
-                'Invalid file format. Only [ .cv ] files are accepted. Try again.'
+                'Invalid file format. Only [ .cv ] and [ .canonical.json ] files are accepted. Try again.'
         }
     }
 }
 
 function ValidateData(fileData: string) {
     try {
-        const parsedFileDate = JSON.parse(fileData)
+        const parsedFileData = JSON.parse(fileData)
+
+        // Check if it's a canonical format file
+        if (isCanonicalFormat(parsedFileData)) {
+            loadCanonical(parsedFileData)
+            return true
+        }
+
+        // Otherwise, validate and load as legacy .cv format
         if (
-            JSON.stringify(Object.keys(parsedFileDate)) !==
+            JSON.stringify(Object.keys(parsedFileData)) !==
             JSON.stringify(JSONSchema)
         )
             throw new Error('Invalid JSON data')
-        parsedFileDate.scopes.forEach((scope: object) => {
+        parsedFileData.scopes.forEach((scope: object) => {
             const keys = Object.keys(scope) // get scope keys
             scopeSchema.forEach((key) => {
                 if (!keys.includes(key)) throw new Error('Invalid Scope data')
             })
         })
-        load(parsedFileDate)
+        load(parsedFileData)
         return true
     } catch (error) {
         document.querySelector('.fileInput')?.classList.add('error--text')
-        errorMessage.value = 'Invalid / Corrupt [ .cv ] file !'
+        errorMessage.value = 'Invalid / Corrupt circuit file!'
         return false
     }
 }

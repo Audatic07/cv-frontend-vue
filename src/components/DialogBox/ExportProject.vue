@@ -26,7 +26,14 @@
                         placeholder="untitled"
                         required
                     />
-                    <p>.cv</p>
+                    <p v-if="exportFormat === 'cv'">.cv</p>
+                    <p v-else>.canonical.json</p>
+                </div>
+                <div class="exportFormatSelect">
+                    <v-radio-group v-model="exportFormat" inline>
+                        <v-radio label="Legacy (.cv)" value="cv" />
+                        <v-radio label="Canonical (.canonical.json)" value="canonical" />
+                    </v-radio-group>
                 </div>
             </v-card-text>
             <v-card-actions>
@@ -41,6 +48,7 @@ import { ref } from 'vue'
 import { useState } from '#/store/SimulatorStore/state'
 import { useProjectStore } from '#/store/projectStore'
 import { generateSaveData } from '#/simulator/src/data/save'
+import { generateCanonicalData } from '#/simulator/src/data/structured_format/exportCanonical'
 import { downloadFile } from '#/simulator/src/utils'
 import { escapeHtml } from '#/simulator/src/utils'
 
@@ -66,14 +74,28 @@ const fileNameInput = ref(
         new Date().toLocaleString().replace(/[: \/,-]/g, '_')
 )
 
+const exportFormat = ref('cv')
+
 const exportAsFile = async () => {
     let fileName = escapeHtml(fileNameInput.value) || 'untitled'
-    const circuitData = await generateSaveData(
-        projectStore.getProjectName,
-        false
-    )
-    fileName = `${fileName.replace(/[^a-z0-9]/gi, '_')}.cv`
-    downloadFile(fileName, circuitData)
+
+    if (exportFormat.value === 'canonical') {
+        // Export in canonical format
+        const canonicalData = await generateCanonicalData(
+            projectStore.getProjectName
+        )
+        fileName = `${fileName.replace(/[^a-z0-9]/gi, '_')}.canonical.json`
+        downloadFile(fileName, canonicalData)
+    } else {
+        // Export in legacy .cv format
+        const circuitData = await generateSaveData(
+            projectStore.getProjectName,
+            false
+        )
+        fileName = `${fileName.replace(/[^a-z0-9]/gi, '_')}.cv`
+        downloadFile(fileName, circuitData)
+    }
+
     SimulatorState.dialogBox.export_project_dialog = false
 }
 </script>
@@ -111,6 +133,12 @@ const exportAsFile = async () => {
 
 .fileNameInput input {
     text-align: center;
+}
+
+.exportFormatSelect {
+    display: flex;
+    justify-content: center;
+    padding: 0.5rem 0;
 }
 </style>
 
