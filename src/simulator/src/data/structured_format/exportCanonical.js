@@ -1,38 +1,24 @@
-/**
- * Export Canonical Circuit Data
- *
- * Generates canonical JSON from the current simulator state.
- * Uses the CanonicalConverter from the structured_format module
- * to convert the live circuit data into the canonical format.
- * @module exportCanonical
- */
-
+// export canonical json from current project
 import { generateSaveData } from '../save'
-
-// Import the converter (works in browser via window global or direct import)
 import { CanonicalConverter } from './canonical_converter'
 
-/**
- * Generate canonical JSON string from the current project state.
- *
- * Flow: Live simulator → generateSaveData() → legacy JSON → CanonicalConverter.toCanonical()
- *
- * @param {string} name - Project name
- * @returns {Promise<string>} Canonical JSON string
- */
+// generate canonical string
 export async function generateCanonicalData(name) {
-    // First generate the legacy save data (this is the standard serialization path)
+    // First generate the legacy save data
     const legacyDataStr = await generateSaveData(name, false)
-
     if (legacyDataStr instanceof Error) {
         throw legacyDataStr
     }
-
-    const legacyData = JSON.parse(legacyDataStr)
-
-    // Convert to canonical format
+    if (typeof legacyDataStr !== 'string') {
+        throw new Error('Legacy save did not return JSON string')
+    }
+    let legacyData
+    try {
+        legacyData = JSON.parse(legacyDataStr)
+    } catch (err) {
+        throw new Error('Could not parse legacy save JSON: ' + err.message)
+    }
+    //then convert that legacy to canonical and output
     const canonical = CanonicalConverter.toCanonical(legacyData)
-
-    // Return formatted JSON
     return JSON.stringify(canonical, null, 2)
 }
